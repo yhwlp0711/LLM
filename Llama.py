@@ -1,4 +1,4 @@
-from transformers.models.llama import LlamaModel, LlamaConfig
+from newtransformers.models.llama import LlamaModel, LlamaConfig
 import torch
 
 config = LlamaConfig(
