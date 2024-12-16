@@ -20,7 +20,7 @@
 对于 token $x_m$，$x_n$，有：  
 $$x_m'=W_qx_me^{im\theta}=q_me^{im\theta}$$
 $$x_n'=W_kx_ne^{in\theta}=k_ne^{in\theta}$$
-其中 $\theta$ 是一个可学习的参数，$m$ 和 $n$ 分别是 token 的位置，$i$ 是虚数单位。
+其中$m$ 和 $n$ 分别是 token 的位置，$i$ 是虚数单位。
 将 q_m 与 k_n 表示为复数，有：
 $$q_m=q_m^1+iq_m^2$$
 $$k_n=k_n^1+ik_n^2$$
@@ -48,15 +48,18 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 
 两两一组，如图所示：
 ![img](src/RoPE.png)
-其中 $\theta_i=1/10000^{2i/d}$。
+其中 $\theta_i=1/ \text{base}^{2i/d}$，基础版本$\text{base}=10000$，如果是动态RoPE则$\text{base}=\text{base}_0\times((\frac{\text{factor}\times seqlen}{maxlen}-(\text{factor}-1)))^{\frac{dim}{dim-2}}$  
+图中将相邻的 $q_i$ 和 $q_{i+1}$ 分为一组旋转，而代码中将 $q_i$ 和 $q_{i+\frac{d}{2}}$ 作为一组。
+![img](src/codeRoPE.jpg)
+
 
 ## 3.SwiGLU(Switched Gated Linear Unit)
 
-|激活函数|公式|特点|
-|:-:|:-:|:-:|
-|GLU|$GLU(x)=(xW_1+b_1)\times \sigma (xW_2+b_2)$|使用Sigmoid，计算复杂的较高|
-|GELU|$GELU(x)=x\times \Phi(x)$|平滑激活，但无门控机制|
-|SwiGLU|$SwiGLU(x)=Swish_\beta (xW_1+b_1) \times (xW_2+b_2)$|引入 Swish 和门控机制，性能优异，计算效率较高|
+| 激活函数 |                         公式                         |                     特点                      |
+| :------: | :--------------------------------------------------: | :-------------------------------------------: |
+|   GLU    |     $GLU(x)=(xW_1+b_1)\times \sigma (xW_2+b_2)$      |          使用Sigmoid，计算复杂的较高          |
+|   GELU   |              $GELU(x)=x\times \Phi(x)$               |            平滑激活，但无门控机制             |
+|  SwiGLU  | $SwiGLU(x)=Swish_\beta (xW_1+b_1) \times (xW_2+b_2)$ | 引入 Swish 和门控机制，性能优异，计算效率较高 |
 
 其中$\Phi (x)$为伯努利分布，$Swish_\beta(x)=x \times \sigma (\beta x)$，$\beta$ 为可学习参数，GLU与SwiGLU中都是矩阵逐元素相乘。
 
@@ -73,8 +76,8 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 
 新的归一化方法。  
 对于一个输入向量 $x$，RMSNorm 的计算公式如下：
-$$RMS(x)=\sqrt {\frac{1}{d} \sum_{i=1}^d x_i^2}$$
-$$\hat x=\frac{x}{RMS(x)+\epsilon}$$
+$$RMS(x)=\sqrt {\frac{1}{d} \sum_{i=1}^d x_i^2 + \epsilon}$$
+$$\hat x=\frac{x}{RMS(x)}$$
 $$RMSNorm(x)=g \times \hat x$$
 其中 $g$ 是可学习的缩放参数，$\epsilon$ 是一个很小的数，用于防止分母为 0。
 
@@ -95,3 +98,4 @@ $$LayerNorm(x)=g \times \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}+\beta$$
 ![img](src/safeSoftmax.png)
 计算量稍微增加，但IO量大幅减少，运行时间大幅减少。
 
+$$\text{invfreq} = \frac{1}{\text{base}^{\left(\frac{2i}{\text{dim}}\right)}}$$

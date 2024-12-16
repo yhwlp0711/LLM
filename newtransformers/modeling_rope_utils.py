@@ -143,6 +143,8 @@ def _compute_dynamic_ntk_parameters(
         factor = rope_kwargs["factor"]
     elif config is not None:
         base = config.rope_theta
+        # partial_rotary_factor<=1
+        # 只取前一部分dim做RoPE，其他部分用其他的编码
         partial_rotary_factor = config.partial_rotary_factor if hasattr(config, "partial_rotary_factor") else 1.0
         head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         dim = int(head_dim * partial_rotary_factor)
