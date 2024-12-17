@@ -168,7 +168,7 @@ class LlamaRotaryEmbedding(nn.Module):
             self._dynamic_frequency_update(position_ids, device=x.device)
 
         # Core RoPE block
-        # inv_freq 从 (head_dim/2,) 扩展为 (batch_size, head_dim/2, 1)，其中 batch_size 是 position_ids 的第一个维度
+        # inv_freq 从 (head_dim/2,) 扩展为 (pos.shape[0], head_dim/2, 1)，其中 batch_size 是 position_ids 的第一个维度
         inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
         # position_ids 从 (batch_size, seq_len) 扩展为 (batch_size, 1, seq_len)，然后转换为 float 类型
         position_ids_expanded = position_ids[:, None, :].float()
@@ -259,8 +259,8 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     Returns:
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
-    cos = cos.unsqueeze(unsqueeze_dim)  # (batch_size, seq_len, head_dim) -> (batch_size, 1, seq_len, head_dim)
-    sin = sin.unsqueeze(unsqueeze_dim)  # (batch_size, seq_len, head_dim) -> (batch_size, 1, seq_len, head_dim)
+    cos = cos.unsqueeze(unsqueeze_dim)  # (pos.shape[0], seq_len, head_dim) -> (pos.shape[0], 1, seq_len, head_dim)
+    sin = sin.unsqueeze(unsqueeze_dim)  # (pos.shape[0], seq_len, head_dim) -> (pos.shape[0], 1, seq_len, head_dim)
     q_embed = (q * cos) + (rotate_half(q) * sin)  # 广播到 (batch_size, num_heads, seq_len, head_dim)  即每个头都用
     k_embed = (k * cos) + (rotate_half(k) * sin)
     # 任意两个q一组都可行，公式推导用了相邻两个，而代码中用了q_0和q_d/2
@@ -633,6 +633,7 @@ class LlamaDecoderLayer(nn.Module):
         super().__init__()
         self.hidden_size = config.hidden_size
 
+        # self.self_attn = LLAMA_ATTENTION_CLASSES["eager"](config=config, layer_idx=layer_idx)
         self.self_attn = LLAMA_ATTENTION_CLASSES[config._attn_implementation](config=config, layer_idx=layer_idx)
 
         self.mlp = LlamaMLP(config)
@@ -845,6 +846,8 @@ class LlamaModel(LlamaPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
+        config._attn_implementation = "eager"  # default to eager for now
+
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList(
             [LlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
@@ -897,7 +900,7 @@ class LlamaModel(LlamaPreTrainedModel):
             use_cache = False
 
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
+            inputs_embeds = self.embed_tokens(input_ids)  # Embedding
 
         # kept for BC (non `Cache` `past_key_values` inputs)
         return_legacy_cache = False
@@ -917,13 +920,13 @@ class LlamaModel(LlamaPreTrainedModel):
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
             cache_position = torch.arange(
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
-            )
+            )  # shape: (seq_len) 0 - (seqlen-1)
         if position_ids is None:
-            position_ids = cache_position.unsqueeze(0)
+            position_ids = cache_position.unsqueeze(0)  # shape: (1, seq_len)
 
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
-        )
+        )  # shape: (batch_size, 1, seq_len, seq_len+1)
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
