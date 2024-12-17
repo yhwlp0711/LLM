@@ -1,8 +1,9 @@
-from newtransformers.models.llama import LlamaModel, LlamaConfig
-import newtransformers.models.llama.modeling_llama as Llama
+from transformers.models.llama import LlamaModel, LlamaConfig
+import transformers.models.llama.modeling_llama as Llama
 import torch
 
-device = torch.device('cuda')
+# device = torch.device('cuda')
+device = torch.device('mps')
 
 hidden_size = 512
 vocab_size = 32000
