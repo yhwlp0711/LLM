@@ -15,4 +15,4 @@ LlamaModel:
        - LlamaRotaryEmbedding (if postion_emb is None, use it)
      - LlamaRMS (input)
      - LlamaRMS (post_attention)
-     - LlamaMLP (SwiGLU: $W_{down}(act(W_{gate}X)*W_{up}X)$) 
+     - LlamaMLP (SwiGLU: $W_{down}(act(W_{gate}X)*W_{up}X)$)
