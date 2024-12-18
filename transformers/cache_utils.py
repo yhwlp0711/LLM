@@ -549,17 +549,22 @@ class DynamicCache(Cache):
             current_split = DynamicCache()
             current_split._seen_tokens = self._seen_tokens
             # tensor shape: (batch_size, num_heads, seq_len, head_dim)
-            # current_split.key_cache shape: (batch_size, num_heads, seq_len, head_dim)
+            # 每一层都切一个split_size出来，相当于对self.key_cache竖着切
+            # current_split.key_cache 为一个list，len为layers，每个元素为一个tensor (split_size, num_heads, seq_len, head_dim)
             current_split.key_cache = [tensor[i : i + split_size] for tensor in self.key_cache]
             current_split.value_cache = [tensor[i : i + split_size] for tensor in self.value_cache]
+            # out为一个list，每个元素为一个DynamicCache，len为full_batch_size // split_size
             out.append(current_split)
         return out
 
     @classmethod
     @deprecate_kwarg("num_hidden_layers", version="4.47.0")
     def from_batch_splits(cls, splits: List["DynamicCache"], num_hidden_layers: int = None) -> "DynamicCache":
-        """This is the opposite of the above `batch_split()` method. This will be used by `stack_model_outputs` in
-        `generation.utils`"""
+        """
+        This is the opposite of the above `batch_split()` method. This will be used by `stack_model_outputs` in
+        `generation.utils`
+        # batch_split的逆操作
+        """
         cache = cls()
         for idx in range(len(splits[0])):
             key_cache = [current.key_cache[idx] for current in splits if current.key_cache[idx] != []]
@@ -571,7 +576,10 @@ class DynamicCache(Cache):
         return cache
 
     def batch_repeat_interleave(self, repeats: int):
-        """Repeat the cache `repeats` times in the batch dimension. Used in contrastive search."""
+        """
+        Repeat the cache `repeats` times in the batch dimension. Used in contrastive search.
+        # 在batch维度上重复缓存`repeats`次
+        """
         for layer_idx in range(len(self)):
             self.key_cache[layer_idx] = self.key_cache[layer_idx].repeat_interleave(repeats, dim=0)
             self.value_cache[layer_idx] = self.value_cache[layer_idx].repeat_interleave(repeats, dim=0)
@@ -579,7 +587,7 @@ class DynamicCache(Cache):
     def batch_select_indices(self, indices: torch.Tensor):
         """Only keep the `indices` in the batch dimension of the cache. Used in contrastive search."""
         for layer_idx in range(len(self)):
-            self.key_cache[layer_idx] = self.key_cache[layer_idx][indices, ...]
+            self.key_cache[layer_idx] = self.key_cache[layer_idx][indices, ...]  # 第一个维度上选择indices，其他维度不变
             self.value_cache[layer_idx] = self.value_cache[layer_idx][indices, ...]
 
 
