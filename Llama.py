@@ -33,7 +33,7 @@ config = LlamaConfig(
     num_hidden_layers=6,
     num_attention_heads=8,
     max_position_embeddings=512,
-    use_cache=False
+    use_cache=True
     )
 
 llama = LlamaModel(config)

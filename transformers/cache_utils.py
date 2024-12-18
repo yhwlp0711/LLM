@@ -1160,30 +1160,39 @@ class StaticCache(Cache):
                 "v4.49. Use the more precisely named 'max_batch_size' argument instead."
             )
 
+        # 设置最大的batch size （batch_size 是一个较旧的参数）
         self.max_batch_size = batch_size or max_batch_size
+        # 设置缓存的最大序列长度
         self.max_cache_len = config.max_position_embeddings if max_cache_len is None else max_cache_len
 
+        # 设置头的维度
         # Some model define a custom `head_dim` != config.hidden_size // config.num_attention_heads
         self.head_dim = (
             config.head_dim if hasattr(config, "head_dim") else config.hidden_size // config.num_attention_heads
         )
 
+        # 设置数据类型
         self.dtype = dtype
+        # 设置头的数量，如果设置了kv_heads则使用
         self.num_key_value_heads = (
             config.num_attention_heads
             if getattr(config, "num_key_value_heads", None) is None
             else config.num_key_value_heads
         )
+        # Cache的形状可以理解为(max_batch_size, num_heads, max_cache_len, head_dim)
 
         self.key_cache: List[torch.Tensor] = []
         self.value_cache: List[torch.Tensor] = []
         # Note: There will be significant perf decrease if switching to use 5D tensors instead.
         cache_shape = (self.batch_size, self.num_key_value_heads, self.max_cache_len, self.head_dim)
+        # 逐DecoderBlock遍历
         for idx in range(config.num_hidden_layers):
+            # 设置device，主要是处理模型分布在不同GPU上的情况
             if layer_device_map is not None:
                 layer_device = layer_device_map[idx]
             else:
                 layer_device = device
+            # 初始化key和value的缓存
             new_layer_key_cache = torch.zeros(cache_shape, dtype=self.dtype, device=layer_device)
             new_layer_value_cache = torch.zeros(cache_shape, dtype=self.dtype, device=layer_device)
             # Notes:
@@ -1198,8 +1207,10 @@ class StaticCache(Cache):
                 new_layer_value_cache = getattr(self, f"value_cache_{idx}")
                 torch._dynamo.mark_static_address(new_layer_key_cache)
                 torch._dynamo.mark_static_address(new_layer_value_cache)
+            # 添加到缓存中
             self.key_cache.append(new_layer_key_cache)
             self.value_cache.append(new_layer_value_cache)
+        # 最后得到的缓存形状为(num_hidden_layers, max_batch_size, num_heads, max_cache_len, head_dim)
 
     def update(
         self,
@@ -1215,10 +1226,13 @@ class StaticCache(Cache):
         Parameters:
             key_states (`torch.Tensor`):
                 The new key states to cache.
+                新的key状态
             value_states (`torch.Tensor`):
                 The new value states to cache.
+                新的value状态
             layer_idx (`int`):
                 The index of the layer to cache the states for.
+                key和value所在的层数
             cache_kwargs (`Dict[str, Any]`, `optional`):
                 Additional arguments for the cache subclass. The `StaticCache` needs the `cache_position` input
                 to know how where to write in the cache.
@@ -1226,15 +1240,19 @@ class StaticCache(Cache):
         Return:
             A tuple containing the updated key and value states.
         """
-
+        # 获取cache_position
         cache_position = cache_kwargs.get("cache_position")
 
+        # 获取所在层的key和value缓存
+        # k_out shape: (max_batch_size, num_heads, max_cache_len, head_dim)
         k_out = self.key_cache[layer_idx]
         v_out = self.value_cache[layer_idx]
+        # 转换新的key和value状态的数据类型
         key_states = key_states.to(k_out.dtype)
         value_states = value_states.to(v_out.dtype)
 
         if cache_position is None:
+            # 全部替换缓存内容
             k_out.copy_(key_states)
             v_out.copy_(value_states)
         else:
@@ -1242,9 +1260,12 @@ class StaticCache(Cache):
             # `tensor[:, :, index] = tensor`, but the first one is compile-friendly and it does explicitly an in-place
             # operation, that avoids copies and uses less memory.
             try:
+                # 将 key_states 中的元素复制到 k_out 的第 2 维度上由 cache_position 指定的位置
+                # 原地操作，替换部分缓存了，性能比直接赋值更好
                 k_out.index_copy_(2, cache_position, key_states)
                 v_out.index_copy_(2, cache_position, value_states)
             except NotImplementedError:
+                # 如果有异常则直接赋值
                 # The operator 'aten::index_copy.out' is not currently implemented for the MPS device.
                 k_out[:, :, cache_position] = key_states
                 v_out[:, :, cache_position] = value_states
@@ -1255,6 +1276,10 @@ class StaticCache(Cache):
         """Returns the sequence length of the cached states that were seen by the model."""
         # Occupied cache == any slot in the 3rd dim (sequence length) holds a non-zero value. To save on compute, let's
         # limit the check to the first batch member and head dimension.
+        # key_cache shape: (num_hidden_layers, max_batch_size, num_heads, max_cache_len, head_dim)
+        # key_cache[layer_idx][0,0] shape: (max_cache_len, head_dim)
+        # any(dim=-1) 会返回一个布尔张量，其中每个元素表示在最后一个维度上是否存在至少一个非零元素 shape: (max_cache_len)
+        # 计算max_cache_len个中有多少个对应的head_dim维度上的元素不为0，即有效的缓存长度
         # TODO: deprecate this function in favor of `cache_position`
         return (self.key_cache[layer_idx][0, 0].any(dim=-1)).sum()
 

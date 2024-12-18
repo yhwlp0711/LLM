@@ -843,10 +843,10 @@ class LlamaModel(LlamaPreTrainedModel):
 
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
-        self.padding_idx = config.pad_token_id
-        self.vocab_size = config.vocab_size
+        self.padding_idx = config.pad_token_id  # <pad> 在词表中的索引
+        self.vocab_size = config.vocab_size  # 词表大小
 
-        config._attn_implementation = "eager"  # default to eager for now
+        config._attn_implementation = "eager"  # Attention 类型
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList(
@@ -855,7 +855,7 @@ class LlamaModel(LlamaPreTrainedModel):
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = LlamaRotaryEmbedding(config=config)
 
-        self.gradient_checkpointing = False
+        self.gradient_checkpointing = False  # 是否启用梯度检查点
         if getattr(config, "pretraining_tp", 1) != 1:
             logger.warn("`pretraining_tp` is deprecated, please use `model.tensor_parallel` instead.")
 
@@ -871,16 +871,16 @@ class LlamaModel(LlamaPreTrainedModel):
     @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
     def forward(
             self,
-            input_ids: torch.LongTensor = None,
-            attention_mask: Optional[torch.Tensor] = None,
-            position_ids: Optional[torch.LongTensor] = None,
-            past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
-            inputs_embeds: Optional[torch.FloatTensor] = None,
-            use_cache: Optional[bool] = None,
-            output_attentions: Optional[bool] = None,
-            output_hidden_states: Optional[bool] = None,
-            return_dict: Optional[bool] = None,
-            cache_position: Optional[torch.LongTensor] = None,
+            input_ids: torch.LongTensor = None,  # 输入的token id
+            attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码
+            position_ids: Optional[torch.LongTensor] = None,  # batch_size * [0, 1, 2, ..., seq_len-1]
+            past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,  # 缓存
+            inputs_embeds: Optional[torch.FloatTensor] = None,  # 嵌入表示
+            use_cache: Optional[bool] = None,  # 是否使用缓存
+            output_attentions: Optional[bool] = None,  # 是否输出注意力权重
+            output_hidden_states: Optional[bool] = None,  # 是否输出隐藏状态
+            return_dict: Optional[bool] = None,  # 是否返回BaseModelOutputWithPast
+            cache_position: Optional[torch.LongTensor] = None,  # 缓存位置
             **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -904,11 +904,12 @@ class LlamaModel(LlamaPreTrainedModel):
 
         # kept for BC (non `Cache` `past_key_values` inputs)
         return_legacy_cache = False
-        if use_cache and not isinstance(past_key_values, Cache):
-            return_legacy_cache = True
-            if past_key_values is None:
+        if use_cache and not isinstance(past_key_values, Cache):  # 如果使用缓存，且缓存不是Cache类型
+            return_legacy_cache = True  # 使用旧的缓存
+            if past_key_values is None:  # 如果缓存为空
                 past_key_values = DynamicCache()
-            else:
+            else:  # 如果缓存不为空
+                # 从旧的缓存中创建新的缓存
                 past_key_values = DynamicCache.from_legacy_cache(past_key_values)
                 logger.warning_once(
                     "We detected that you are passing `past_key_values` as a tuple of tuples. This is deprecated and "
@@ -969,19 +970,23 @@ class LlamaModel(LlamaPreTrainedModel):
             hidden_states = layer_outputs[0]
 
             if use_cache:
+                # 如果使用缓存，则更新缓存
                 next_decoder_cache = layer_outputs[2 if output_attentions else 1]
 
             if output_attentions:
+                # 记录注意力权重
                 all_self_attns += (layer_outputs[1],)
 
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
+            # 记录隐藏状态
             all_hidden_states += (hidden_states,)
 
         next_cache = next_decoder_cache if use_cache else None
         if return_legacy_cache:
+            # 如果使用了旧的缓存，则返回旧的缓存
             next_cache = next_cache.to_legacy_cache()
 
         if not return_dict:

@@ -99,3 +99,17 @@ $$LayerNorm(x)=g \times \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}+\beta$$
 计算量稍微增加，但IO量大幅减少，运行时间大幅减少。
 
 $$\text{invfreq} = \frac{1}{\text{base}^{\left(\frac{2i}{\text{dim}}\right)}}$$
+
+## 8.COT(Chain of Thought)
+
+过引导模型逐步推理和生成中间步骤，从而提高模型在复杂任务上的表现。COT的核心思想是将复杂问题分解为一系列简单的步骤，逐步解决每个步骤，最终得到问题的答案。  
+
+## 9.Page Attention(VLLM)
+
+借鉴操作系统中的虚拟内存和页管理技术，将显存划分为KV block，即操作系统中的最小单元（页），按KV block来管理KV Cache。  
+![img](src/PageAttention.png)
+
+KV blocks 共享：N个相同的prompt时，在物理KV Cache中只存一份，并标记block的引用数，开始生成时，若生成的token要放入的block引用大于1，则拷贝一份到新的block中再写入。  
+![img](src/KVShare.png)
+此事在 beam search 中亦有记载。
+![img](src/beamsearch.png)
