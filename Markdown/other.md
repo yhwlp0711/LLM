@@ -1,4 +1,5 @@
 # Others
+在github网页上的显示公式似乎有点问题，在vscode以及pycharm中正常。  
 
 ## 1.GQA(Grouped query attention)
 
