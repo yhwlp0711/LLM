@@ -18,39 +18,39 @@
 ### 2.1假设词嵌入为二维  
 
 对于 token $x_m$，$x_n$，有：  
-$$x_m'=W_qx_me^{im\theta}=q_me^{im\theta}$$
-$$x_n'=W_kx_ne^{in\theta}=k_ne^{in\theta}$$
-其中$m$ 和 $n$ 分别是 token 的位置，$i$ 是虚数单位。
-将 q_m 与 k_n 表示为复数，有：
-$$q_m=q_m^1+iq_m^2$$
-$$k_n=k_n^1+ik_n^2$$
-而根据欧拉公式，有：
-$$e^{i\theta}=cos\theta+isin\theta$$
-则：
-$$q_me^{im\theta}=(q_m^1+iq_m^2)(cosm\theta+isinm\theta)$$
-$$q_me^{im\theta}=(q_m^1cosm\theta-q_m^2sinm\theta)+i(q_m^1sinm\theta+q_m^2cosm\theta)$$
-再表示为向量形式：
-$$q_me^{im\theta}=\begin{bmatrix}cosm\theta & -sinm\theta\\sinm\theta & cos\theta\end{bmatrix}\begin{bmatrix}q_m^1\\q_m^2\end{bmatrix}$$
-同理：
-$$k_ne^{in\theta}=\begin{bmatrix}cosn\theta & -sinn\theta\\sinn\theta & cos\theta\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$
-故：
-$$x_m'^Tx_n'=(q_me^{im\theta})^T(k_ne^{in\theta})=\begin{bmatrix}q_m^1 & q_m^2\end{bmatrix}\begin{bmatrix}cosm\theta & -sinm\theta\\sinm\theta & cos\theta\end{bmatrix}^T\begin{bmatrix}cosn\theta & -sinn\theta\\sinn\theta & cos\theta\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$
+$$x_m'=W_qx_me^{im\theta}=q_me^{im\theta}$$  
+$$x_n'=W_kx_ne^{in\theta}=k_ne^{in\theta}$$  
+其中$m$ 和 $n$ 分别是 token 的位置，$i$ 是虚数单位。  
+将 q_m 与 k_n 表示为复数，有：  
+$$q_m=q_m^1+iq_m^2$$  
+$$k_n=k_n^1+ik_n^2$$  
+而根据欧拉公式，有：  
+$$e^{i\theta}=cos\theta+isin\theta$$  
+则：  
+$$q_me^{im\theta}=(q_m^1+iq_m^2)(cosm\theta+isinm\theta)$$  
+$$q_me^{im\theta}=(q_m^1cosm\theta-q_m^2sinm\theta)+i(q_m^1sinm\theta+q_m^2cosm\theta)$$  
+再表示为向量形式：  
+$$q_me^{im\theta}=\begin{bmatrix}cosm\theta & -sinm\theta\\sinm\theta & cos\theta\end{bmatrix}\begin{bmatrix}q_m^1\\q_m^2\end{bmatrix}$$  
+同理：  
+$$k_ne^{in\theta}=\begin{bmatrix}cosn\theta & -sinn\theta\\sinn\theta & cos\theta\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$  
+故：  
+$$x_m'^Tx_n'=(q_me^{im\theta})^T(k_ne^{in\theta})=\begin{bmatrix}q_m^1 & q_m^2\end{bmatrix}\begin{bmatrix}cosm\theta & -sinm\theta\\sinm\theta & cos\theta\end{bmatrix}^T\begin{bmatrix}cosn\theta & -sinn\theta\\sinn\theta & cos\theta\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$  
 化简得：  
-$$x_m'^Tx_n'=\begin{bmatrix}q_m^1 & q_m^2\end{bmatrix}\begin{bmatrix}cos((m-n)\theta) & -sin((m-n)\theta)\\sin((m-n)\theta) & cos((m-n)\theta)\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$
+$$x_m'^Tx_n'=\begin{bmatrix}q_m^1 & q_m^2\end{bmatrix}\begin{bmatrix}cos((m-n)\theta) & -sin((m-n)\theta)\\sin((m-n)\theta) & cos((m-n)\theta)\end{bmatrix}\begin{bmatrix}k_n^1\\k_n^2\end{bmatrix}$$  
 直接从位置函数的角度考虑：  
-$$g(x_m'^T,x_n',m-n)=Re[(W_qx_m)^T(W_kx_n)^*e^{i(m-n)\theta}]$$
-其中 Re 表示取实部，$x^*$表示共轭，$m-n$表示位置差。
+$$g(x_m'^T,x_n',m-n)=Re[(W_qx_m)^T(W_kx_n)^*e^{i(m-n)\theta}]$$  
+其中 Re 表示取实部，$x^*$表示共轭，$m-n$表示位置差。  
 ![img](src/RoPE1.png)  
 如图，在二维空间中，q 被旋转了 m 角度，k 被旋转了 n 角度，两者的点积就是他们在旋转后的位置的点积。  
-$R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n 角度。
+$R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n 角度。  
 
 ### 2.2推广到多维
 
 两两一组，如图所示：
-![img](src/RoPE.png)
+![img](src/RoPE.png)  
 其中 $\theta_i=1/ \text{base}^{2i/d}$，基础版本$\text{base}=10000$，如果是动态RoPE则$\text{base}=\text{base}_0\times((\frac{\text{factor}\times seqlen}{maxlen}-(\text{factor}-1)))^{\frac{dim}{dim-2}}$  
-图中将相邻的 $q_i$ 和 $q_{i+1}$ 分为一组旋转，而代码中将 $q_i$ 和 $q_{i+\frac{d}{2}}$ 作为一组。
-![img](src/codeRoPE.jpg)
+图中将相邻的 $q_i$ 和 $q_{i+1}$ 分为一组旋转，而代码中将 $q_i$ 和 $q_{i+\frac{d}{2}}$ 作为一组。  
+![img](src/codeRoPE.jpg)  
 
 
 ## 3.SwiGLU(Switched Gated Linear Unit)
@@ -61,7 +61,7 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 |   GELU   |              $GELU(x)=x\times \Phi(x)$               |            平滑激活，但无门控机制             |
 |  SwiGLU  | $SwiGLU(x)=Swish_\beta (xW_1+b_1) \times (xW_2+b_2)$ | 引入 Swish 和门控机制，性能优异，计算效率较高 |
 
-其中$\Phi (x)$为伯努利分布，$Swish_\beta(x)=x \times \sigma (\beta x)$，$\beta$ 为可学习参数，GLU与SwiGLU中都是矩阵逐元素相乘。
+其中$\Phi (x)$为伯努利分布，$Swish_\beta(x)=x \times \sigma (\beta x)$，$\beta$ 为可学习参数，GLU与SwiGLU中都是矩阵逐元素相乘。  
 
 ## 4.MOE(Mixture of Experts)
 
