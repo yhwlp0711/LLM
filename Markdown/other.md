@@ -46,9 +46,9 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 
 ### 2.2推广到多维
 
-两两一组，如图所示：
+两两一组，如图所示：  
 ![img](src/RoPE.png)  
-其中 $\theta_i=1/ \text{base}^{2i/d}$，基础版本$\text{base}=10000$，如果是动态RoPE则$\text{base}=\text{base}_0\times((\frac{\text{factor}\times seqlen}{maxlen}-(\text{factor}-1)))^{\frac{dim}{dim-2}}$  
+其中 $\theta_i=1/ \text{base}^{2i/d}$，基础版本$\text{base}=10000$，如果是动态RoPE则$\text{base}=\text{base}_0\times((\frac{\text{factor}\times seqlen}{maxlen}-(\text{factor}-1)))^{\frac{dim}{dim-2}}$    
 图中将相邻的 $q_i$ 和 $q_{i+1}$ 分为一组旋转，而代码中将 $q_i$ 和 $q_{i+\frac{d}{2}}$ 作为一组。  
 ![img](src/codeRoPE.jpg)  
 
@@ -75,30 +75,30 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 ## 6.RMSNorm
 
 新的归一化方法。  
-对于一个输入向量 $x$，RMSNorm 的计算公式如下：
-$$RMS(x)=\sqrt {\frac{1}{d} \sum_{i=1}^d x_i^2 + \epsilon}$$
-$$\hat x=\frac{x}{RMS(x)}$$
-$$RMSNorm(x)=g \times \hat x$$
-其中 $g$ 是可学习的缩放参数，$\epsilon$ 是一个很小的数，用于防止分母为 0。
-
-原LayerNorm的计算公式如下：
-$$LayerNorm(x)=g \times \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}+\beta$$
-其中 $\mu$ 是均值，$\sigma$ 是标准差，$g$ 和 $\beta$ 是可学习的缩放和偏移参数。
+对于一个输入向量 $x$，RMSNorm 的计算公式如下：  
+$$RMS(x)=\sqrt {\frac{1}{d} \sum_{i=1}^d x_i^2 + \epsilon}$$  
+$$\hat x=\frac{x}{RMS(x)}$$  
+$$RMSNorm(x)=g \times \hat x$$  
+其中 $g$ 是可学习的缩放参数，$\epsilon$ 是一个很小的数，用于防止分母为 0。  
+  
+原LayerNorm的计算公式如下：  
+$$LayerNorm(x)=g \times \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}+\beta$$  
+其中 $\mu$ 是均值，$\sigma$ 是标准差，$g$ 和 $\beta$ 是可学习的缩放和偏移参数。  
 
 ## 7.FlashAttention
 
-传统self-attention中，假设 $Q$、$K$ 的维度为 $d$，序列长度为 $n$，则计算复杂度为 $O(n^2d)$ (weight 矩阵为 $n \times n$，每个位置需要 $d$ 次乘法并求和)，空间复杂度为 $O(n^2)$。
-![img](src/Attention.png)
+传统self-attention中，假设 $Q$、$K$ 的维度为 $d$，序列长度为 $n$，则计算复杂度为 $O(n^2d)$ (weight 矩阵为 $n \times n$，每个位置需要 $d$ 次乘法并求和)，空间复杂度为 $O(n^2)$。  
+![img](src/Attention.png)  
 
-在IO维度上加速Attention的计算。将 $Q$、$K$、$V$ 按对应的维度进行分块，每次得到小的 weight，并直接计算 Output 的一部分，从而避免在HBM中保存 Weight 矩阵。
-![img](src/FlashAttention.png)
-- safeSoftmax及其分块  
+在IO维度上加速Attention的计算。将 $Q$、$K$、$V$ 按对应的维度进行分块，每次得到小的 weight，并直接计算 Output 的一部分，从而避免在HBM中保存 Weight 矩阵。  
+![img](src/FlashAttention.png)  
+- safeSoftmax及其分块    
 保证在计算softmax时不会出现数值溢出(FP16混合精度)的情况。  
-在分块得到O的情况下仍能计算出正确的结果。
-![img](src/safeSoftmax.png)
-计算量稍微增加，但IO量大幅减少，运行时间大幅减少。
+在分块得到O的情况下仍能计算出正确的结果。  
+![img](src/safeSoftmax.png)  
+计算量稍微增加，但IO量大幅减少，运行时间大幅减少。  
 
-$$\text{invfreq} = \frac{1}{\text{base}^{\left(\frac{2i}{\text{dim}}\right)}}$$
+$$\text{invfreq} = \frac{1}{\text{base}^{\left(\frac{2i}{\text{dim}}\right)}}$$  
 
 ## 8.COT(Chain of Thought)
 
