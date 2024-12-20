@@ -88,10 +88,9 @@ $$LayerNorm(x)=g \times \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}+\beta$$
 
 ## 7.FlashAttention
 
-传统self-attention中，假设 $Q$、$K$ 的维度为 $d$，序列长度为 $n$，则计算复杂度为 $O(n^2d)$ (weight 矩阵为 $n \times n$，每个位置需要 $d$ 次乘法并求和)，空间复杂度为 $O(n^2)$。  
-![img](src/Attention.png)  
+传统self-attention中，假设 $Q$、$K$ 的维度为 $d$，序列长度为 $n$，则计算复杂度为 $O(n^2d)$ (weight 矩阵为 $n \times n$，每个位置需要 $d$ 次乘法并求和)，空间复杂度为 $O(n^2)$。
 
-在IO维度上加速Attention的计算。将 $Q$、$K$、$V$ 按对应的维度进行分块，每次得到小的 weight，并直接计算 Output 的一部分，从而避免在HBM中保存 Weight 矩阵。  
+FlashAttention在IO维度上加速Attention的计算。将 $Q$、$K$、$V$ 按对应的维度进行分块，每次得到小的 weight，并直接计算 Output 的一部分，从而避免在HBM中保存 Weight 矩阵。  
 ![img](src/FlashAttention.png)  
 - safeSoftmax及其分块    
 保证在计算softmax时不会出现数值溢出(FP16混合精度)的情况。  
