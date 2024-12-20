@@ -373,7 +373,7 @@ class LlamaAttention(nn.Module):
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
         if attention_mask is not None:  # no matter the length, we just slice it
-            causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+            causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]  # 取前seq_len个
             attn_weights = attn_weights + causal_mask
 
         # upcast attention to fp32
@@ -928,6 +928,7 @@ class LlamaModel(LlamaPreTrainedModel):
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
         )  # shape: (batch_size, 1, seq_len, seq_len+1)
+        # temp = causal_mask[0][0]
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
@@ -1100,13 +1101,20 @@ class LlamaModel(LlamaPreTrainedModel):
             # In this case we assume that the mask comes already in inverted form and requires no inversion or slicing.
             causal_mask = attention_mask
         else:
-            min_dtype = torch.finfo(dtype).min
+            min_dtype = torch.finfo(dtype).min  # 获取当前数据类型的最小值
+            # 创建一个全为最小值的矩阵 shape: (seq_len, target_len)
             causal_mask = torch.full(
                 (sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=device
             )
+
+            # 返回矩阵的上三角部分，其他部分为0（包括对角线）
             if sequence_length != 1:
                 causal_mask = torch.triu(causal_mask, diagonal=1)
+            
+            # torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)  # shape: (seq_len, target_len)
+            # causal_mask shape: (seq_len, target_len)
             causal_mask *= torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)
+            # shape: (batch_size, 1, seq_len, target_len)
             causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
             if attention_mask is not None:
                 causal_mask = causal_mask.clone()  # copy to contiguous memory for in-place edit

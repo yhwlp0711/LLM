@@ -36,9 +36,9 @@ config = LlamaConfig(
     use_cache=True
     )
 
-llama = LlamaModel(config)
+# llama = LlamaModel(config)
 
-X = torch.randint(low=0, high=32000, size=(4, 100))  # (batch_size, seq_len)
+# X = torch.randint(low=0, high=32000, size=(4, 100))  # (batch_size, seq_len)
 
-output = llama(X)
-print(output)  # torch.Size([4, 100, 512])
+# output = llama(X)
+# print(output)  # torch.Size([4, 100, 512])
