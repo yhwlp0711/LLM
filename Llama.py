@@ -36,9 +36,38 @@ config = LlamaConfig(
     use_cache=True
     )
 
-# llama = LlamaModel(config)
 
-# X = torch.randint(low=0, high=32000, size=(4, 100))  # (batch_size, seq_len)
+class MyLlama(torch.nn.Module):
+    def __init__(self, config):
+        super(MyLlama, self).__init__()
+        self.llama = LlamaModel(config)
+        self.Linear = torch.nn.Linear(hidden_size, vocab_size)
 
-# output = llama(X)
-# print(output)  # torch.Size([4, 100, 512])
+    def forward(self, X):
+        return self.Linear(self.llama(X))
+
+
+def train_LlamaModel(config, device):
+    model = MyLlama(config)
+    model = model.to(device)
+    model.train()
+    X = torch.randint(low=0, high=vocab_size, size=(4, 100))  # (batch_size=4, len_seq=100)
+    X = X.to(device)
+    y_hat = model(X)
+    print(y_hat.shape)
+
+
+def test_LlamaModel(config, max_len, device):
+    model = LlamaModel(config)
+    model = model.to(device)
+    model.eval()
+    X = torch.randint(low=0, high=vocab_size, size=(1, 1))
+    X = X.to(device)
+    res = [X[0][0].item()]
+    for _ in range(max_len):
+        y_hat = model(X)
+        y = y_hat.argmax(dim=-1).unsqueeze(0)
+        res.append(y[0][0].item())
+        X = y
+
+    print(res)
