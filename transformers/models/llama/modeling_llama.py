@@ -374,7 +374,7 @@ class LlamaAttention(nn.Module):
 
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]  # 取前seq_len个
-            attn_weights = attn_weights + causal_mask
+            attn_weights = attn_weights + causal_mask  # 应用mask
 
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
@@ -872,7 +872,7 @@ class LlamaModel(LlamaPreTrainedModel):
     def forward(
             self,
             input_ids: torch.LongTensor = None,  # 输入的token id
-            attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码
+            attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码 input的有效长度
             position_ids: Optional[torch.LongTensor] = None,  # batch_size * [0, 1, 2, ..., seq_len-1]
             past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,  # 缓存
             inputs_embeds: Optional[torch.FloatTensor] = None,  # 嵌入表示
@@ -919,7 +919,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
-            cache_position = torch.arange(
+            cache_position = torch.arange(  # token的索引
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
             )  # shape: (seq_len) 0 - (seqlen-1)
         if position_ids is None:
@@ -971,7 +971,7 @@ class LlamaModel(LlamaPreTrainedModel):
             hidden_states = layer_outputs[0]
 
             if use_cache:
-                # 如果使用缓存，则更新缓存
+                # 如果使用缓存，则更新缓存  训练过程中next_decoder_cache等于past_key_values
                 next_decoder_cache = layer_outputs[2 if output_attentions else 1]
 
             if output_attentions:
@@ -1033,7 +1033,7 @@ class LlamaModel(LlamaPreTrainedModel):
         if using_static_cache:
             target_length = past_key_values.get_max_cache_shape()
         else:
-            target_length = (
+            target_length = (  # 期望输出的序列长度
                 attention_mask.shape[-1]
                 if isinstance(attention_mask, torch.Tensor)
                 else past_seen_tokens + sequence_length + 1
@@ -1076,6 +1076,7 @@ class LlamaModel(LlamaPreTrainedModel):
             **kwargs,
     ):
         """
+        根据上三角mask以及输入序列的有效长度，生成一个4D的mask
         Creates a causal 4D mask of shape `(batch_size, 1, query_length, key_value_length)` from a 2D mask of shape
         `(batch_size, key_value_length)`, or if the input `attention_mask` is already 4D, do nothing.
 
@@ -1113,12 +1114,15 @@ class LlamaModel(LlamaPreTrainedModel):
             
             # torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)  # shape: (seq_len, target_len)
             # causal_mask shape: (seq_len, target_len)
-            causal_mask *= torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)
+            causal_mask *= torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)  # 广播 训练阶段仍为上三角的bool矩阵
             # shape: (batch_size, 1, seq_len, target_len)
             causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
             if attention_mask is not None:
                 causal_mask = causal_mask.clone()  # copy to contiguous memory for in-place edit
                 mask_length = attention_mask.shape[-1]
+                # causal_mask shape: (batch_size, 1, seq_len, target_len)  其中有效部分为0，无效部分为-inf
+                # attention_mask shape: (batch_size, mask_length)  其中有效部分为1，无效部分为0
+                # 二者相加，为1的位置才是最后的有效部分，为0的位置设置为-inf，原本的-inf不影响
                 padding_mask = causal_mask[:, :, :, :mask_length] + attention_mask[:, None, None, :]
                 padding_mask = padding_mask == 0
                 causal_mask[:, :, :, :mask_length] = causal_mask[:, :, :, :mask_length].masked_fill(
