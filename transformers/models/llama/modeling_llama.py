@@ -366,7 +366,7 @@ class LlamaAttention(nn.Module):
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)  # (bsz, num_key_value_heads, seen_token, head_dim)
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
@@ -921,7 +921,7 @@ class LlamaModel(LlamaPreTrainedModel):
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
             cache_position = torch.arange(  # token的索引
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
-            )  # shape: (seq_len) 0 - (seqlen-1)
+            )
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)  # shape: (1, seq_len)
 
@@ -1108,7 +1108,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 (sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=device
             )
 
-            # 返回矩阵的上三角部分，其他部分为0（包括对角线）
+            # 返回矩阵的上三角部分，其他部分为0（包括对角线）   如果输入序列的有效长度为1，则说明是推理阶段
             if sequence_length != 1:
                 causal_mask = torch.triu(causal_mask, diagonal=1)
             

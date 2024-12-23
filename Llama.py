@@ -44,8 +44,9 @@ class MyLlama(torch.nn.Module):
         self.llama = LlamaModel(config)
         self.Linear = torch.nn.Linear(config.hidden_size, config.vocab_size)
 
-    def forward(self, X, attention_mask=None):
-        return self.Linear(self.llama(X, attention_mask).last_hidden_state)
+    def forward(self, X, attention_mask=None, past_key_values=None):
+        out = self.llama(X, attention_mask=attention_mask, past_key_values=past_key_values)
+        return self.Linear(out.last_hidden_state), out.past_key_values
 
 
 def train_LlamaModel(config, device):
@@ -61,15 +62,16 @@ def train_LlamaModel(config, device):
 
 
 def test_LlamaModel(config, max_len, device):
-    model = LlamaModel(config)
+    model = MyLlama(config)
     model = model.to(device)
     model.eval()
     X = torch.randint(low=0, high=config.vocab_size, size=(1, 1))
     X = X.to(device)
+    past_key_values = None
     res = [X[0][0].item()]
     for _ in range(max_len):
-        y_hat = model(X)
-        y = y_hat.argmax(dim=-1).unsqueeze(0)
+        y_hat, past_key_values = model(X, past_key_values=past_key_values)
+        y = y_hat.argmax(dim=-1)
         res.append(y[0][0].item())
         X = y
 
