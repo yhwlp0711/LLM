@@ -1,5 +1,5 @@
 from transformers.models.llama import LlamaModel, LlamaConfig
-import transformers.models.llama.modeling_llama as Llama
+# import transformers.models.llama.modeling_llama as Llama
 import torch
 
 device = torch.device('cuda')
@@ -78,6 +78,6 @@ def test_LlamaModel(config, max_len, device):
     print(res)
 
 
-# train_LlamaModel(config, device)
+train_LlamaModel(config, device)
 
-test_LlamaModel(config, 100, device)
+# test_LlamaModel(config, 100, device)
