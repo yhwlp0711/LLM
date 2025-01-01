@@ -125,6 +125,7 @@ class LlamaRotaryEmbedding(nn.Module):
 
         # 初始化频率(sinmθ中的θ)和注意力缩放因子，缩放因子对得到的正弦和余弦值进行缩放
         # inv_freq[i] = 1 / (base ** (2 * i / head_dim))
+        # inv_freq shape(head_dim/2)
         # 注意，对于x的每个seq，对应的inv_freq都是相同的，inv_freq的计算只与dim维度的索引有关
         inv_freq, self.attention_scaling = self.rope_init_fn(self.config, device, **self.rope_kwargs)
         self.register_buffer("inv_freq", inv_freq, persistent=False)

@@ -1,4 +1,5 @@
 # Others
+
 在github网页上显示公式似乎有点问题，在vscode以及pycharm中正常。  
 
 ## 1.GQA(Grouped query attention)
@@ -52,7 +53,31 @@ $R(m)R(n)^T$即为先旋转 m 角度，再旋转 -n 角度，等价于旋转 m-n
 其中 $\theta_i=1/ \text{base}^{2i/d}$，基础版本$\text{base}=10000$，如果是动态RoPE则$\text{base}=\text{base}_0\times((\frac{\text{factor}\times seqlen}{maxlen}-(\text{factor}-1)))^{\frac{dim}{dim-2}}$    
 图中将相邻的 $q_i$ 和 $q_{i+1}$ 分为一组旋转，而代码中将 $q_i$ 和 $q_{i+\frac{d}{2}}$ 作为一组。  
 ![img](src/codeRoPE.jpg)  
-
+代码在初始化阶段先根据 `head_dim` 计算了inv_freq，shape为(d/2)，即公式中的 $\theta_i$  
+$$(\theta_0, \theta_1, ... ,\theta_{d/2-1})$$  
+在forward阶段，`position_id` 为
+$$(0, 1, 2, ... , seq_len)$$  
+和inv_freq一起reshape之后广播按位相乘得到freq  
+$$\begin{matrix}
+    m_0\theta_0 & m_0\theta_1 & ... & m_0\theta_{d/2-1}
+    \\
+    m_1\theta_0 & m_1\theta_1 & ... & m_1\theta_{d/2-1}
+    \\
+    ...
+    \\
+    m_{len-1}\theta_0 & m_{len-1}\theta_1 & ... & m_{len-1}\theta_{d/2-1}
+\end{matrix}$$
+freq复制一份(freq cat freq)得到emb 
+$$\begin{matrix}
+    m_0\theta_0 & ... & m_0\theta_{d/2-1} & m_0\theta_0 & ... & m_0\theta_{d/2-1}
+    \\
+    m_1\theta_0 & ... & m_1\theta_{d/2-1} & m_1\theta_0 & ... & m_1\theta_{d/2-1}
+    \\
+    ...
+    \\
+    m_{len-1}\theta_0 & ... & m_{len-1}\theta_{d/2-1} & m_{len-1}\theta_0 & ... & m_{len-1}\theta_{d/2-1}
+\end{matrix}$$
+逐位做cos和sin，在 `apply_rotary_pos_emb` 函数中分别与q，k以及变换后的q、k逐位相乘，得到带位置信息的q，k  
 
 ## 3.SwiGLU(Switched Gated Linear Unit)
 
@@ -97,8 +122,6 @@ FlashAttention在IO维度上加速Attention的计算。将 $Q$、$K$、$V$ 按�
 在分块得到O的情况下仍能计算出正确的结果。  
 ![img](src/safeSoftmax.png)  
 计算量稍微增加，但IO量大幅减少，运行时间大幅减少。  
-
-$$\text{invfreq} = \frac{1}{\text{base}^{\left(\frac{2i}{\text{dim}}\right)}}$$  
 
 ## 8.COT(Chain of Thought)
 
