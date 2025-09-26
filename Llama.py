@@ -58,7 +58,7 @@ def train_LlamaModel(config, device):
     attention_mask = attention_mask.to(device)
     X = X.to(device)
     y_hat = model(X, attention_mask)
-    print(y_hat.shape)
+    print(y_hat[0].shape)
 
 
 def test_LlamaModel(config, max_len, device):

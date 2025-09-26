@@ -1,6 +1,6 @@
 # LLM
 
-堂堂连载中  
+~~堂堂连载中~~ 无限期停刊  
 
 transformers 目录来自 pip install transformers  
 
